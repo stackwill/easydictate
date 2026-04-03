@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:1a1a2e,50:16213e,100:0f3460&height=220&section=header&text=EasyDictate&fontSize=72&fontColor=e94560&fontAlignY=42&desc=GNOME%20Voice%20Dictation%20Daemon&descSize=20&descAlignY=64&descFontColor=a8b2d8&animation=fadeIn" alt="EasyDictate" />
+<img src="docs/banner.svg" alt="EasyDictate" />
 
 <br/>
 
@@ -229,6 +229,3 @@ Functional but early-stage. The daemon path is the primary supported workflow. T
 
 No license file has been added yet. Choose a license before publishing this repository publicly.
 
-<div align="center">
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:1a1a2e,50:16213e,100:0f3460&height=100&section=footer" alt="" />
-</div>

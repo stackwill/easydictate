@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="220" viewBox="0 0 800 220">
+  <style>@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@800&amp;family=JetBrains+Mono:wght@400&amp;display=swap');</style>
+  <text x="400" y="108" font-family="'Outfit',sans-serif" font-size="74" font-weight="800" fill="#0a0a0a" text-anchor="middle" letter-spacing="-3">EasyDictate</text>
+  <text x="400" y="155" font-family="'JetBrains Mono',monospace" font-size="14" fill="#8b949e" text-anchor="middle" letter-spacing="5">VOICE DICTATION FOR GNOME</text>
+</svg>
