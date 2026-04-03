@@ -1,0 +1,1 @@
+"""easydictate package."""
