@@ -45,6 +45,7 @@ install_package_if_missing() {
 }
 
 install_package_if_missing ffmpeg ffmpeg
+install_package_if_missing ydotool ydotool
 install_package_if_missing wtype wtype
 
 if [[ ! -x .venv/bin/python ]]; then
@@ -112,3 +113,8 @@ printf 'Config: %s\n' "$CONFIG_PATH"
 printf 'Log: %s\n' "$STATE_DIR/daemon.log"
 printf 'Desktop entry: %s\n' "$DESKTOP_PATH"
 printf 'Service: systemctl --user status easydictate.service\n'
+printf '\n'
+printf 'GNOME Wayland auto-paste requirement:\n'
+printf '  sudo usermod -aG input %s\n' "$USER"
+printf '  systemctl --user enable --now ydotool.service\n'
+printf '  Then sign out and back in so the new group membership applies.\n'

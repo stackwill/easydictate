@@ -87,6 +87,7 @@ When enabled, EasyDictate copies the transcript to the clipboard and then attemp
 Paste shortcut behavior:
 
 - X11: `Ctrl+Shift+V` via `xdotool`
-- Wayland: `Ctrl+Shift+V` via `wtype`, or `ydotool` when `ydotoold` is available with uinput access
+- GNOME Wayland: `Ctrl+Shift+V` via `ydotool`, with a running `ydotoold` and `/dev/uinput` access
+- Other Wayland desktops: `Ctrl+Shift+V` via `wtype`, or `ydotool` when available
 
 If auto-paste is not possible in the current session, EasyDictate still copies the transcript to the clipboard.

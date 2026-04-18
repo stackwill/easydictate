@@ -120,9 +120,11 @@ def choose_paste_command(env: dict[str, str] | None = None, which: WhichFn | Non
         return ["xdotool", "key", "--clearmodifiers", "ctrl+shift+v"]
     wayland_runtime = has_wayland_runtime(env)
     desktop = (env.get("XDG_CURRENT_DESKTOP") or env.get("DESKTOP_SESSION") or "").lower()
-    if wayland_runtime and which("wtype"):
-        if "gnome" in desktop and which("ydotool") and has_ydotool_socket(env):
+    if wayland_runtime and "gnome" in desktop:
+        if which("ydotool") and has_ydotool_socket(env):
             return ["ydotool", "key", "29:1", "42:1", "47:1", "47:0", "42:0", "29:0"]
+        return None
+    if wayland_runtime and which("wtype"):
         return ["wtype", "-M", "ctrl", "-M", "shift", "v", "-m", "shift", "-m", "ctrl"]
     if wayland_runtime and which("ydotool") and has_ydotool_socket(env):
         return ["ydotool", "key", "29:1", "42:1", "47:1", "47:0", "42:0", "29:0"]

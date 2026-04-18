@@ -58,13 +58,10 @@ class ChoosePasteCommandTests(unittest.TestCase):
                 ["ydotool", "key", "29:1", "42:1", "47:1", "47:0", "42:0", "29:0"],
             )
 
-    def test_falls_back_to_wtype_when_ydotool_socket_is_missing(self) -> None:
+    def test_returns_none_on_gnome_wayland_when_ydotool_socket_is_missing(self) -> None:
         env = {"WAYLAND_DISPLAY": "wayland-0", "XDG_CURRENT_DESKTOP": "GNOME", "XDG_RUNTIME_DIR": "/tmp/missing"}
         which = lambda name: f"/usr/bin/{name}" if name in {"wtype", "ydotool"} else None
-        self.assertEqual(
-            choose_paste_command(env, which),
-            ["wtype", "-M", "ctrl", "-M", "shift", "v", "-m", "shift", "-m", "ctrl"],
-        )
+        self.assertIsNone(choose_paste_command(env, which))
 
     def test_uses_wayland_socket_when_display_env_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

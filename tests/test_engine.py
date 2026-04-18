@@ -97,6 +97,19 @@ class RecordMicrophoneTests(unittest.TestCase):
 
 
 class AutoPasteTests(unittest.TestCase):
+    def test_logs_and_returns_false_when_wtype_lacks_virtual_keyboard_support(self) -> None:
+        error = subprocess.CalledProcessError(
+            1,
+            ["wtype", "-M", "ctrl", "v"],
+            stderr="Compositor does not support the virtual keyboard protocol",
+        )
+        with mock.patch("easydictate.engine.choose_paste_command", return_value=["wtype", "-M", "ctrl", "v"]):
+            with mock.patch("easydictate.engine.time.sleep"):
+                with mock.patch("easydictate.engine.LOGGER") as logger_mock:
+                    with mock.patch("easydictate.engine.subprocess.run", side_effect=error):
+                        self.assertFalse(engine.autopaste_text())
+        logger_mock.warning.assert_called_once()
+
     def test_retries_ydotool_connection_refused(self) -> None:
         error = subprocess.CalledProcessError(
             1,

@@ -68,7 +68,7 @@ GROQ_API_KEY=your_key_here
 This will:
 
 1. Create `.venv`
-2. Try to install `ffmpeg` and `wtype` when they are not already available
+2. Try to install `ffmpeg`, `ydotool`, and `wtype` when they are not already available
 3. Install the package
 4. Create a default config file with `record_backend` set to `ffmpeg`
 5. Write a desktop entry matching the portal app ID
@@ -86,6 +86,19 @@ On first successful portal bind, GNOME may prompt you to approve the global shor
 | Mode | `toggle` |
 
 **Toggle mode:** first press starts recording, second press stops, transcribes, copies, and attempts paste.
+
+### GNOME Wayland auto-paste requirement
+
+Auto-paste on GNOME Wayland is not a generic virtual-keyboard feature in practice. EasyDictate requires `ydotoold` with access to `/dev/uinput`.
+
+Run:
+
+```bash
+sudo usermod -aG input "$USER"
+systemctl --user enable --now ydotool.service
+```
+
+Then sign out and back in before relying on auto-paste.
 
 ---
 
@@ -105,7 +118,8 @@ On first successful portal bind, GNOME may prompt you to approve the global shor
 | Recording | `ffmpeg`, `parecord`, `pw-record`, `arecord`, Python `sounddevice` |
 | Clipboard (Wayland) | `wl-copy` |
 | Clipboard (X11) | `xclip` or `xsel` |
-| Auto-paste (Wayland) | `wtype` preferred, `ydotool` only with a working `ydotoold` |
+| Auto-paste (GNOME Wayland) | `ydotool` with a running `ydotoold` and `/dev/uinput` access |
+| Auto-paste (other Wayland desktops) | `wtype` or `ydotool` |
 | Auto-paste (X11) | `xdotool` |
 
 ---

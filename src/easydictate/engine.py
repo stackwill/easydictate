@@ -365,9 +365,16 @@ def copy_to_clipboard(text: str) -> None:
 
 
 def autopaste_text() -> bool:
+    env = dict(os.environ)
     command = choose_paste_command()
     if command is None:
-        if has_wayland_runtime(dict(os.environ)):
+        desktop = (env.get("XDG_CURRENT_DESKTOP") or env.get("DESKTOP_SESSION") or "").lower()
+        if has_wayland_runtime(env) and "gnome" in desktop:
+            LOGGER.info(
+                "Auto-paste unavailable: GNOME Wayland requires `ydotoold` with `/dev/uinput` access. "
+                "Add the user to the `input` group, sign in again, and enable `ydotool.service`."
+            )
+        elif has_wayland_runtime(env):
             LOGGER.info(
                 "Auto-paste unavailable: no Wayland paste helper found. Install `wtype`, "
                 "or configure a working `ydotoold` with uinput access."
@@ -384,7 +391,20 @@ def autopaste_text() -> bool:
             return True
         except subprocess.CalledProcessError as exc:
             stderr = (exc.stderr or "").lower() if isinstance(exc.stderr, str) else ""
+            if command[0] == "wtype" and "virtual keyboard protocol" in stderr:
+                LOGGER.warning(
+                    "Auto-paste failed: wtype is installed, but the compositor rejected virtual keyboard input "
+                    "(%s).",
+                    (exc.stderr or "").strip(),
+                )
+                return False
             if command[0] != "ydotool" or "connection refused" not in stderr:
+                LOGGER.warning(
+                    "Auto-paste command failed: %s (exit %s)%s",
+                    " ".join(command),
+                    exc.returncode,
+                    f" - {(exc.stderr or '').strip()}" if exc.stderr else "",
+                )
                 raise
             last_error = exc
             if attempt < retries - 1:
