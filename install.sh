@@ -16,32 +16,36 @@ DESKTOP_PATH="$APPLICATIONS_DIR/com.easydictate.app.desktop"
 
 mkdir -p "$CONFIG_DIR" "$STATE_DIR" "$SERVICE_DIR" "$APPLICATIONS_DIR"
 
-install_ffmpeg_if_missing() {
-  if command -v ffmpeg >/dev/null 2>&1; then
+install_package_if_missing() {
+  local binary="$1"
+  local package_name="$2"
+
+  if command -v "$binary" >/dev/null 2>&1; then
     return
   fi
 
-  printf 'ffmpeg not found; attempting to install it for the default recorder backend.\n'
+  printf '%s not found; attempting to install package %s.\n' "$binary" "$package_name"
 
   if command -v pacman >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
-    sudo pacman --noconfirm --needed -S ffmpeg || true
+    sudo pacman --noconfirm --needed -S "$package_name" || true
   elif command -v apt-get >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
     sudo apt-get update || true
-    sudo apt-get install -y ffmpeg || true
+    sudo apt-get install -y "$package_name" || true
   elif command -v dnf >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
-    sudo dnf install -y ffmpeg || true
+    sudo dnf install -y "$package_name" || true
   elif command -v zypper >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
-    sudo zypper --non-interactive install ffmpeg || true
+    sudo zypper --non-interactive install "$package_name" || true
   else
-    printf 'Warning: could not auto-install ffmpeg on this system. Install it manually to use the default backend.\n' >&2
+    printf 'Warning: could not auto-install %s on this system. Install package %s manually.\n' "$binary" "$package_name" >&2
   fi
 
-  if ! command -v ffmpeg >/dev/null 2>&1; then
-    printf 'Warning: ffmpeg is still unavailable; EasyDictate will fall back to other recording backends until it is installed.\n' >&2
+  if ! command -v "$binary" >/dev/null 2>&1; then
+    printf 'Warning: %s is still unavailable after the install attempt.\n' "$binary" >&2
   fi
 }
 
-install_ffmpeg_if_missing
+install_package_if_missing ffmpeg ffmpeg
+install_package_if_missing wtype wtype
 
 if [[ ! -x .venv/bin/python ]]; then
   python3 -m venv .venv

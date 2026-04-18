@@ -68,7 +68,7 @@ GROQ_API_KEY=your_key_here
 This will:
 
 1. Create `.venv`
-2. Try to install `ffmpeg` when it is not already available
+2. Try to install `ffmpeg` and `wtype` when they are not already available
 3. Install the package
 4. Create a default config file with `record_backend` set to `ffmpeg`
 5. Write a desktop entry matching the portal app ID
@@ -105,7 +105,7 @@ On first successful portal bind, GNOME may prompt you to approve the global shor
 | Recording | `ffmpeg`, `parecord`, `pw-record`, `arecord`, Python `sounddevice` |
 | Clipboard (Wayland) | `wl-copy` |
 | Clipboard (X11) | `xclip` or `xsel` |
-| Auto-paste (Wayland) | `wtype` or `ydotool` |
+| Auto-paste (Wayland) | `wtype` preferred, `ydotool` only with a working `ydotoold` |
 | Auto-paste (X11) | `xdotool` |
 
 ---

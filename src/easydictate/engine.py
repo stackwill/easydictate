@@ -20,6 +20,7 @@ from easydictate.core import (
     choose_paste_command,
     format_missing_recording_error,
     format_process_error,
+    has_wayland_runtime,
     read_settings,
     require_api_key,
     resolve_error_report_path,
@@ -366,6 +367,13 @@ def copy_to_clipboard(text: str) -> None:
 def autopaste_text() -> bool:
     command = choose_paste_command()
     if command is None:
+        if has_wayland_runtime(dict(os.environ)):
+            LOGGER.info(
+                "Auto-paste unavailable: no Wayland paste helper found. Install `wtype`, "
+                "or configure a working `ydotoold` with uinput access."
+            )
+        else:
+            LOGGER.info("Auto-paste unavailable: no supported paste helper found for this session")
         return False
     time.sleep(0.08)
     retries = 4 if command and command[0] == "ydotool" else 1

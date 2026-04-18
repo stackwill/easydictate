@@ -38,10 +38,17 @@ Required tools:
 
 - Wayland clipboard: `wl-copy`
 - X11 clipboard: `xclip` or `xsel`
-- Wayland paste: `wtype` or `ydotool`
+- Wayland paste: `wtype` preferred, or `ydotool` with a working `ydotoold`
 - X11 paste: `xdotool`
 
-GNOME/Wayland can restrict input simulation depending on the tool and session setup.
+If `ydotool` is installed but auto-paste still does nothing, check the user service:
+
+```bash
+systemctl --user status ydotool.service
+journalctl --user -u ydotool.service -n 50 --no-pager
+```
+
+If the log mentions `failed to open uinput device: Permission denied`, install `wtype` instead.
 
 ## Recording fails
 
