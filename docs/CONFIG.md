@@ -66,6 +66,7 @@ Behavior:
 
 - Type: string
 - Optional
+- Default: `ffmpeg` when the config file is created by `./install.sh`
 - Valid values: `ffmpeg`, `parecord`, `pw-record`, `arecord`, `sounddevice`
 
 If omitted, EasyDictate tries backends in this order:

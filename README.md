@@ -68,10 +68,11 @@ GROQ_API_KEY=your_key_here
 This will:
 
 1. Create `.venv`
-2. Install the package
-3. Create a default config file
-4. Write a desktop entry matching the portal app ID
-5. Install and enable `easydictate.service`
+2. Try to install `ffmpeg` when it is not already available
+3. Install the package
+4. Create a default config file with `record_backend` set to `ffmpeg`
+5. Write a desktop entry matching the portal app ID
+6. Install and enable `easydictate.service`
 
 ### 3. Approve the shortcut
 
@@ -228,4 +229,3 @@ Functional but early-stage. The daemon path is the primary supported workflow. T
 ## License
 
 No license file has been added yet. Choose a license before publishing this repository publicly.
-

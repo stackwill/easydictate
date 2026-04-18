@@ -36,6 +36,11 @@ REQUEST_INTERFACE = "org.freedesktop.portal.Request"
 SESSION_INTERFACE = "org.freedesktop.portal.Session"
 REGISTRY_INTERFACE = "org.freedesktop.host.portal.Registry"
 SHORTCUT_ID = "dictation"
+STALE_SHORTCUT_TIMEOUT_MS = 1000
+
+
+class PortalUnavailableError(RuntimeError):
+    """Raised when the required desktop portal capability is unavailable."""
 
 
 @dataclass
@@ -61,16 +66,39 @@ class DictationDaemon:
         self.recording_thread: threading.Thread | None = None
         self.stop_event: threading.Event | None = None
         self.audio_path: Path | None = None
+        self.shortcut_active = False
+        self.last_activation_timestamp: int | None = None
+        self.stop_requested = False
         self.lock = threading.Lock()
 
-    def handle_shortcut_activated(self, shortcut_id: str) -> None:
+    def handle_shortcut_activated(self, shortcut_id: str, timestamp: int | None = None) -> None:
         if shortcut_id != SHORTCUT_ID:
             return
+        recording = self.is_recording()
+        if self.stop_requested:
+            return
+        if self.shortcut_active:
+            stale_toggle_state = (
+                self.config.hotkey_mode == "toggle"
+                and not recording
+                and timestamp is not None
+                and self.last_activation_timestamp is not None
+                and timestamp - self.last_activation_timestamp > STALE_SHORTCUT_TIMEOUT_MS
+            )
+            if not stale_toggle_state:
+                return
+            self.logger.warning(
+                "Clearing stale shortcut-active state after missing deactivation for %sms",
+                timestamp - self.last_activation_timestamp,
+            )
+            self.shortcut_active = False
+        self.shortcut_active = True
+        self.last_activation_timestamp = timestamp
         if self.config.hotkey_mode == "hold":
-            if not self.is_recording():
+            if not recording:
                 self.start_recording()
             return
-        if self.is_recording():
+        if recording:
             self.stop_recording()
         else:
             self.start_recording()
@@ -78,6 +106,7 @@ class DictationDaemon:
     def handle_shortcut_deactivated(self, shortcut_id: str) -> None:
         if shortcut_id != SHORTCUT_ID:
             return
+        self.shortcut_active = False
         if self.config.hotkey_mode != "hold":
             return
         if self.is_recording():
@@ -101,6 +130,9 @@ class DictationDaemon:
         with self.lock:
             if self.stop_event is None:
                 return
+            if self.stop_requested:
+                return
+            self.stop_requested = True
             self.stop_event.set()
             self.logger.info("Recording stop requested")
 
@@ -132,6 +164,7 @@ class DictationDaemon:
                 self.recording_thread = None
                 self.stop_event = None
                 self.audio_path = None
+                self.stop_requested = False
 
 
 class GlobalShortcutsPortal:
@@ -161,7 +194,10 @@ class GlobalShortcutsPortal:
         on_deactivated: callable,
     ) -> list[dict[str, Any]]:
         self._register_app(app_id)
-        self.session_handle = self._create_session()
+        try:
+            self.session_handle = self._create_session()
+        except GLib.Error as exc:
+            raise self._describe_portal_error(exc) from exc
         self._subscribe_shortcut_signals(on_activated=on_activated, on_deactivated=on_deactivated)
         metadata = self._load_metadata()
         force_bind = metadata.get("bound_hotkey") != preferred_trigger
@@ -258,12 +294,26 @@ class GlobalShortcutsPortal:
                 Gio.DBusCallFlags.NONE,
                 -1,
                 None,
-            )
+        )
         except GLib.Error as exc:
+            if "No such interface" in (exc.message or ""):
+                return
             message = exc.message or ""
             if "already associated with an application ID" not in message:
                 raise
         self.logger.info("Registered app id %s with host portal registry", app_id)
+
+    def _describe_portal_error(self, exc: GLib.Error) -> Exception:
+        message = exc.message or str(exc)
+        if PORTAL_INTERFACE in message and "No such interface" in message:
+            return PortalUnavailableError(
+                "The desktop portal on this session does not provide "
+                "`org.freedesktop.portal.GlobalShortcuts`, so EasyDictate "
+                "cannot register its hotkey. Install or enable an XDG desktop "
+                "portal backend with Global Shortcuts support, then restart "
+                "the service."
+            )
+        return exc
 
     def _bind_shortcuts(self, preferred_trigger: str) -> list[dict[str, Any]]:
         if self.session_handle is None:
@@ -359,9 +409,9 @@ class GlobalShortcutsPortal:
             _signal_name: str,
             parameters: GLib.Variant,
         ) -> None:
-            session_handle, shortcut_id, _timestamp, _options = parameters.unpack()
+            session_handle, shortcut_id, timestamp, options = parameters.unpack()
             if session_handle == self.session_handle:
-                on_activated(shortcut_id)
+                on_activated(shortcut_id, timestamp)
 
         def deactivated_callback(
             _connection: Gio.DBusConnection,
@@ -508,14 +558,21 @@ def main() -> None:
         applications_dir=resolve_applications_dir(),
         exec_command=f"{Path(__file__).resolve().parents[2] / '.venv' / 'bin' / 'easydictate'} daemon",
     )
-    shortcuts = portal.start(
-        app_id=APP_ID,
-        preferred_trigger=config.hotkey,
-        on_activated=daemon.handle_shortcut_activated,
-        on_deactivated=daemon.handle_shortcut_deactivated,
-    )
-    logger.info("Portal ready with shortcuts: %s", portal._describe_shortcuts(shortcuts))
-    loop.run()
+    try:
+        shortcuts = portal.start(
+            app_id=APP_ID,
+            preferred_trigger=config.hotkey,
+            on_activated=daemon.handle_shortcut_activated,
+            on_deactivated=daemon.handle_shortcut_deactivated,
+        )
+        logger.info("Portal ready with shortcuts: %s", portal._describe_shortcuts(shortcuts))
+        loop.run()
+    except PortalUnavailableError as exc:
+        error_path = persist_error(state_dir, str(exc))
+        logger.error("%s Details: %s", exc, error_path)
+        if portal is not None:
+            portal.shutdown()
+        return
 
 
 if __name__ == "__main__":

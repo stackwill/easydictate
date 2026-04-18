@@ -8,6 +8,32 @@ from easydictate import engine
 
 
 class RunDictationSessionTests(unittest.TestCase):
+    def test_passes_preferred_source_to_record_microphone(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            audio_path = state_dir / "capture.wav"
+            audio_path.write_bytes(b"RIFFdemo")
+            stop_event = mock.Mock()
+
+            with mock.patch(
+                "easydictate.engine.read_settings",
+                return_value={
+                    "GROQ_API_KEY": "secret",
+                    "record_source": "alsa_input.usb-headset",
+                },
+            ):
+                with mock.patch("easydictate.engine.record_microphone", return_value="ffmpeg") as record_mock:
+                    with mock.patch("easydictate.engine.transcribe_audio", return_value="hello world"):
+                        with mock.patch("easydictate.engine.copy_to_clipboard"):
+                            with mock.patch("easydictate.engine.autopaste_text", return_value=False):
+                                engine.run_dictation_session(
+                                    state_dir=state_dir,
+                                    audio_path=audio_path,
+                                    stop_event=stop_event,
+                                )
+
+            self.assertEqual(record_mock.call_args.kwargs["preferred_source"], "alsa_input.usb-headset")
+
     def test_raises_clear_error_when_backend_produces_no_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

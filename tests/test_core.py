@@ -6,6 +6,7 @@ from pathlib import Path
 from easydictate.core import (
     build_record_backend_order,
     build_transcription_request,
+    choose_clipboard_command,
     choose_paste_command,
     choose_record_backend,
     format_process_error,
@@ -48,15 +49,57 @@ class ChoosePasteCommandTests(unittest.TestCase):
         )
 
     def test_prefers_ydotool_on_gnome_wayland(self) -> None:
-        env = {"WAYLAND_DISPLAY": "wayland-0", "XDG_CURRENT_DESKTOP": "GNOME"}
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, ".ydotool_socket").touch()
+            env = {"WAYLAND_DISPLAY": "wayland-0", "XDG_CURRENT_DESKTOP": "GNOME", "XDG_RUNTIME_DIR": tmp}
+            which = lambda name: f"/usr/bin/{name}" if name in {"wtype", "ydotool"} else None
+            self.assertEqual(
+                choose_paste_command(env, which),
+                ["ydotool", "key", "29:1", "42:1", "47:1", "47:0", "42:0", "29:0"],
+            )
+
+    def test_falls_back_to_wtype_when_ydotool_socket_is_missing(self) -> None:
+        env = {"WAYLAND_DISPLAY": "wayland-0", "XDG_CURRENT_DESKTOP": "GNOME", "XDG_RUNTIME_DIR": "/tmp/missing"}
         which = lambda name: f"/usr/bin/{name}" if name in {"wtype", "ydotool"} else None
         self.assertEqual(
             choose_paste_command(env, which),
-            ["ydotool", "key", "29:1", "42:1", "47:1", "47:0", "42:0", "29:0"],
+            ["wtype", "-M", "ctrl", "-M", "shift", "v", "-m", "shift", "-m", "ctrl"],
         )
+
+    def test_uses_wayland_socket_when_display_env_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "wayland-0").touch()
+            env = {"XDG_RUNTIME_DIR": tmp}
+            which = lambda name: f"/usr/bin/{name}" if name == "wtype" else None
+            self.assertEqual(
+                choose_paste_command(env, which),
+                ["wtype", "-M", "ctrl", "-M", "shift", "v", "-m", "shift", "-m", "ctrl"],
+            )
 
     def test_returns_none_without_supported_tool(self) -> None:
         self.assertIsNone(choose_paste_command({}, lambda _: None))
+
+
+class ChooseClipboardCommandTests(unittest.TestCase):
+    def test_uses_wl_copy_when_wayland_display_is_available(self) -> None:
+        env = {"WAYLAND_DISPLAY": "wayland-0"}
+        which = lambda name: f"/usr/bin/{name}" if name == "wl-copy" else None
+        self.assertEqual(choose_clipboard_command(env, which), ["wl-copy"])
+
+    def test_uses_wl_copy_when_wayland_socket_exists_without_display_env(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "wayland-0").touch()
+            env = {"XDG_RUNTIME_DIR": tmp}
+            which = lambda name: f"/usr/bin/{name}" if name == "wl-copy" else None
+            self.assertEqual(choose_clipboard_command(env, which), ["wl-copy"])
+
+    def test_uses_xclip_when_x11_is_available(self) -> None:
+        env = {"DISPLAY": ":0"}
+        which = lambda name: f"/usr/bin/{name}" if name == "xclip" else None
+        self.assertEqual(choose_clipboard_command(env, which), ["xclip", "-selection", "clipboard"])
+
+    def test_returns_none_without_supported_tool_or_session(self) -> None:
+        self.assertIsNone(choose_clipboard_command({}, lambda _: None))
 
 
 class ChooseRecordBackendTests(unittest.TestCase):

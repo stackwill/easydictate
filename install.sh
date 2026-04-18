@@ -16,6 +16,33 @@ DESKTOP_PATH="$APPLICATIONS_DIR/com.easydictate.app.desktop"
 
 mkdir -p "$CONFIG_DIR" "$STATE_DIR" "$SERVICE_DIR" "$APPLICATIONS_DIR"
 
+install_ffmpeg_if_missing() {
+  if command -v ffmpeg >/dev/null 2>&1; then
+    return
+  fi
+
+  printf 'ffmpeg not found; attempting to install it for the default recorder backend.\n'
+
+  if command -v pacman >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
+    sudo pacman --noconfirm --needed -S ffmpeg || true
+  elif command -v apt-get >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
+    sudo apt-get update || true
+    sudo apt-get install -y ffmpeg || true
+  elif command -v dnf >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
+    sudo dnf install -y ffmpeg || true
+  elif command -v zypper >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
+    sudo zypper --non-interactive install ffmpeg || true
+  else
+    printf 'Warning: could not auto-install ffmpeg on this system. Install it manually to use the default backend.\n' >&2
+  fi
+
+  if ! command -v ffmpeg >/dev/null 2>&1; then
+    printf 'Warning: ffmpeg is still unavailable; EasyDictate will fall back to other recording backends until it is installed.\n' >&2
+  fi
+}
+
+install_ffmpeg_if_missing
+
 if [[ ! -x .venv/bin/python ]]; then
   python3 -m venv .venv
 fi
@@ -32,6 +59,7 @@ config_path = Path(os.environ["CONFIG_PATH"])
 defaults = {
     "hotkey": "CTRL+bracketright",
     "hotkey_mode": "toggle",
+    "record_backend": "ffmpeg",
 }
 
 if config_path.exists():

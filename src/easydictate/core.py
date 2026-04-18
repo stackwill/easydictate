@@ -10,6 +10,22 @@ from typing import Any, Callable
 WhichFn = Callable[[str], str | None]
 
 
+def has_wayland_runtime(env: dict[str, str]) -> bool:
+    if env.get("WAYLAND_DISPLAY"):
+        return True
+    runtime_dir = env.get("XDG_RUNTIME_DIR")
+    if not runtime_dir:
+        return False
+    return any(Path(runtime_dir).glob("wayland-*"))
+
+
+def has_ydotool_socket(env: dict[str, str]) -> bool:
+    runtime_dir = env.get("XDG_RUNTIME_DIR")
+    if not runtime_dir:
+        return False
+    return (Path(runtime_dir) / ".ydotool_socket").exists()
+
+
 def resolve_state_dir(env: dict[str, str] | None = None) -> Path:
     env = env or dict(os.environ)
     base = env.get("XDG_STATE_HOME")
@@ -102,12 +118,13 @@ def choose_paste_command(env: dict[str, str] | None = None, which: WhichFn | Non
 
     if env.get("DISPLAY") and which("xdotool"):
         return ["xdotool", "key", "--clearmodifiers", "ctrl+shift+v"]
+    wayland_runtime = has_wayland_runtime(env)
     desktop = (env.get("XDG_CURRENT_DESKTOP") or env.get("DESKTOP_SESSION") or "").lower()
-    if env.get("WAYLAND_DISPLAY") and which("wtype"):
-        if "gnome" in desktop and which("ydotool"):
+    if wayland_runtime and which("wtype"):
+        if "gnome" in desktop and which("ydotool") and has_ydotool_socket(env):
             return ["ydotool", "key", "29:1", "42:1", "47:1", "47:0", "42:0", "29:0"]
         return ["wtype", "-M", "ctrl", "-M", "shift", "v", "-m", "shift", "-m", "ctrl"]
-    if env.get("WAYLAND_DISPLAY") and which("ydotool"):
+    if wayland_runtime and which("ydotool") and has_ydotool_socket(env):
         return ["ydotool", "key", "29:1", "42:1", "47:1", "47:0", "42:0", "29:0"]
     return None
 
@@ -116,7 +133,7 @@ def choose_clipboard_command(env: dict[str, str] | None = None, which: WhichFn |
     env = env or dict(os.environ)
     which = which or shutil.which
 
-    if env.get("WAYLAND_DISPLAY") and which("wl-copy"):
+    if has_wayland_runtime(env) and which("wl-copy"):
         return ["wl-copy"]
     if env.get("DISPLAY") and which("xclip"):
         return ["xclip", "-selection", "clipboard"]

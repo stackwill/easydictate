@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import queue
 import signal
@@ -28,6 +29,7 @@ from easydictate.core import (
 
 DEFAULT_SAMPLE_RATE = 16_000
 DEFAULT_CHANNELS = 1
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -57,7 +59,13 @@ def run_dictation_session(
 ) -> DictationResult:
     settings = read_settings()
     preferred_backend = settings.get("EASYDICTATE_RECORD_BACKEND") or settings.get("record_backend")
-    backend = record_microphone(audio_path, stop_event, preferred_backend=preferred_backend)
+    preferred_source = settings.get("EASYDICTATE_RECORD_SOURCE") or settings.get("record_source")
+    backend = record_microphone(
+        audio_path,
+        stop_event,
+        preferred_backend=preferred_backend,
+        preferred_source=str(preferred_source) if preferred_source else None,
+    )
     ensure_recording_exists(audio_path, backend)
     text = transcribe_audio(
         audio_path=audio_path,
@@ -77,16 +85,26 @@ def run_dictation_session(
     return DictationResult(text=text, pasted=pasted, audio_path=audio_path, backend=backend)
 
 
-def record_microphone(audio_path: Path, stop_event: Event, preferred_backend: str | None = None) -> str:
+def record_microphone(
+    audio_path: Path,
+    stop_event: Event,
+    preferred_backend: str | None = None,
+    preferred_source: str | None = None,
+) -> str:
     errors: list[str] = []
     for backend in build_record_backend_order(shutil_which, preferred=preferred_backend):
         try:
+            LOGGER.info(
+                "Attempting recording via %s%s",
+                backend,
+                f" using source {preferred_source}" if preferred_source else "",
+            )
             if backend == "ffmpeg":
-                record_with_ffmpeg(audio_path, stop_event)
+                record_with_ffmpeg(audio_path, stop_event, source=preferred_source)
             elif backend == "parecord":
-                record_with_parecord(audio_path, stop_event)
+                record_with_parecord(audio_path, stop_event, source=preferred_source)
             elif backend == "pw-record":
-                record_with_pw_record(audio_path, stop_event)
+                record_with_pw_record(audio_path, stop_event, source=preferred_source)
             elif backend == "arecord":
                 record_with_arecord(audio_path, stop_event)
             else:
@@ -146,40 +164,36 @@ def record_with_sounddevice(audio_path: Path, stop_event: Event) -> None:
         raise RuntimeError(f"Audio input error: {callback_error[0]}")
 
 
-def record_with_pw_record(audio_path: Path, stop_event: Event) -> None:
-    run_command_recorder(
-        [
-            "pw-record",
-            "--format",
-            "s16",
-            "--rate",
-            str(DEFAULT_SAMPLE_RATE),
-            "--channels",
-            str(DEFAULT_CHANNELS),
-            "--container",
-            "wav",
-            str(audio_path),
-        ],
-        audio_path,
+def record_with_pw_record(audio_path: Path, stop_event: Event, source: str | None = None) -> None:
+    command = [
         "pw-record",
-        stop_event,
-    )
+        "--format",
+        "s16",
+        "--rate",
+        str(DEFAULT_SAMPLE_RATE),
+        "--channels",
+        str(DEFAULT_CHANNELS),
+        "--container",
+        "wav",
+    ]
+    if source:
+        command.extend(["--target", source])
+    command.append(str(audio_path))
+    run_command_recorder(command, audio_path, "pw-record", stop_event)
 
 
-def record_with_parecord(audio_path: Path, stop_event: Event) -> None:
-    run_command_recorder(
-        [
-            "parecord",
-            "--rate=16000",
-            "--channels=1",
-            "--format=s16le",
-            "--file-format=wav",
-            str(audio_path),
-        ],
-        audio_path,
+def record_with_parecord(audio_path: Path, stop_event: Event, source: str | None = None) -> None:
+    command = [
         "parecord",
-        stop_event,
-    )
+        "--rate=16000",
+        "--channels=1",
+        "--format=s16le",
+        "--file-format=wav",
+    ]
+    if source:
+        command.append(f"--device={source}")
+    command.append(str(audio_path))
+    run_command_recorder(command, audio_path, "parecord", stop_event)
 
 
 def record_with_arecord(audio_path: Path, stop_event: Event) -> None:
@@ -203,7 +217,7 @@ def record_with_arecord(audio_path: Path, stop_event: Event) -> None:
     )
 
 
-def record_with_ffmpeg(audio_path: Path, stop_event: Event) -> None:
+def record_with_ffmpeg(audio_path: Path, stop_event: Event, source: str | None = None) -> None:
     audio_path.parent.mkdir(parents=True, exist_ok=True)
     process = subprocess.Popen(
         [
@@ -214,7 +228,7 @@ def record_with_ffmpeg(audio_path: Path, stop_event: Event) -> None:
             "-f",
             "pulse",
             "-i",
-            "default",
+            source or "default",
             "-ac",
             str(DEFAULT_CHANNELS),
             "-ar",
